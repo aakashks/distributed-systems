@@ -24,6 +24,10 @@ class BSS
     // operations (final output)
     vector<vector<string>> operations;
 
+    // halt operation outputs and resume again using this
+    vector<int> halted_op;
+    vector<pair<int, string>> halted_for_msg;
+
     int n;
 
     bool check_bss(int sender, vector<int> &vt, vector<int> &local)
@@ -38,47 +42,86 @@ class BSS
         return true;
     }
 
-    void check_buffer(vector<int> local, int receiver)
-    {
-        // check previous entries in buffer that can now be delivered
-        for (auto it = buffer[receiver].begin(); it != buffer[receiver].end();)
-        {
-            int s = it->first;
-            string m = it->second;
-            if (messages[s].find(m) != messages[s].end() 
-                    && check_bss(s, messages[s][m], local))
+public:
+    BSS(int n = 9) : n(n), vector_clocks(n, vector<int>(n, 0)), messages(n), 
+        rec_msgs(n), buffer(n), operations(n), halted_op(n, -1), halted_for_msg(n, make_pair(-1, "")) {}
+
+    void push_operation(int pid, string op) {
+        operations[pid].push_back(op);
+    }
+
+    void run_rec_ops(int pid, int op_id) {
+        for (int i = op_id; i < operations[pid].size(); i++) {
+            auto op = operations[pid][i];
+            if (op.substr(0, 6) == "recv_B")
             {
-                rec_msgs[receiver].emplace_back(s, m);
-                merge_vcs(local, messages[s][m]);
-                cout << "recv_A p" << s + 1 << " " << m << " " << print_vc(local) << endl;
-                it = buffer[receiver].erase(it);
+                int sender_id = stoi(op.substr(8, 1)) - 1;
+                string msg = op.substr(10);
+
+                // check if message exists or not
+                if (messages[sender_id].count(msg) == 0) {
+                    halted_op[pid] = i;
+                    halted_for_msg[pid] = {sender_id, msg};
+                    break;
+                }
+
+                receive_B(sender_id, msg, pid);
             }
-            else
-                it++;
         }
     }
 
-public:
-    BSS(int n = 9) : n(n), vector_clocks(n, vector<int>(n, 0)), messages(n), 
-        rec_msgs(n), buffer(n), operations(n) {}
+    void simulate() {
+        for (int pid = 0; pid < n; pid++) {
+            for (int i = 0; i < operations[pid].size(); i++) {
+                auto& op = operations[pid][i];
+                if (op.substr(0, 4) == "send") {
+                    string msg = op.substr(5);
+                    op += " " + broadcast(pid, msg);
 
-    void broadcast(int sender, string msg)
+                    // check if the any process is halted for this message
+                    for (int j = 0; j < n; j++) {
+                        if (halted_op[j] != -1 && halted_for_msg[j] == make_pair(pid, msg)) {
+                            int resume_op = halted_op[j];
+                            halted_op[j] = -1;
+                            halted_for_msg[j] = {-1, ""};
+                            run_rec_ops(j, resume_op);
+                        }
+                    }
+                }
+                else if (op.substr(0, 6) == "recv_B")
+                {
+                    run_rec_ops(pid, i);
+                }
+            }
+        }
+    }
+
+    void print_output() {
+        for (int i = 0; i < n; i++) {
+            cout << "begin process p" << i + 1 << endl;
+            for (auto &op : operations[i]) {
+                if (!op.empty()) cout << op << endl;
+            }
+            cout << "end process p" << i + 1 << endl << endl;
+        }
+    }
+
+    string broadcast(int sender, string msg)
     {
         vector_clocks[sender][sender]++;
         messages[sender][msg] = vector_clocks[sender];
-        operations[sender].push_back("send " + msg + " " + print_vc(vector_clocks[sender]));
+        return print_vc(vector_clocks[sender]);
     }
 
     void receive_B(int sender, string msg, int receiver)
     {
         vector<int> &local = vector_clocks[receiver];
-        operations[receiver].push_back("recv_B p" + to_string(sender + 1) + " " + msg + " " + print_vc(local));
+        // operations[receiver].push_back("recv_B p" + to_string(sender + 1) + " " + msg + " " + print_vc(local));
 
-        check_buffer(local, receiver);
+        check_buffer(receiver);
 
         // check if the current message can be delivered
-        if (messages[sender].find(msg) != messages[sender].end() 
-                && check_bss(sender, messages[sender][msg], local))
+        if (check_bss(sender, messages[sender][msg], local))
         {
             rec_msgs[receiver].emplace_back(sender, msg);
             merge_vcs(local, messages[sender][msg]);
@@ -88,7 +131,27 @@ public:
         else
             buffer[receiver].emplace_back(sender, msg);
 
-        check_buffer(local, receiver);
+        check_buffer(receiver);
+    }
+
+    void check_buffer(int receiver)
+    {
+        vector<int> &local = vector_clocks[receiver];
+        // check previous entries in buffer that can now be delivered
+        for (auto it = buffer[receiver].begin(); it != buffer[receiver].end();)
+        {
+            int s = it->first;
+            string m = it->second;
+            if (messages[s].count(m) && check_bss(s, messages[s][m], local))
+            {
+                rec_msgs[receiver].emplace_back(s, m);
+                merge_vcs(local, messages[s][m]);
+                operations[receiver].push_back("recv_A p" + to_string(s + 1) + " " + m + " " + print_vc(local));
+                it = buffer[receiver].erase(it);
+            }
+            else
+                it++;
+        }
     }
 
     /////
@@ -114,7 +177,8 @@ public:
 int main()
 {
     string line;
-    vector<pair<int, vector<string>>> operations;
+    vector<int> pids;
+    vector<vector<string>> operations(9);
     int pi;
     int np = 0;
 
@@ -124,7 +188,7 @@ int main()
         {
             string process_name = line.substr(14);
             pi = stoi(process_name.substr(1)) - 1;
-            operations.push_back({pi, {}});
+            pids.push_back(pi);
         }
         else if (line.substr(0, 11) == "end process")
         {
@@ -132,30 +196,20 @@ int main()
             continue;
         }
         else
-        {
-            operations.back().second.push_back(line);
-        }
+            operations[pi].push_back(line);
+
     }
 
     BSS bss(np);
 
-    for (auto [pid, ops] : operations)
+    for (auto pid : pids)
     {
-        for (string &op : ops)
-        {
-            if (op.substr(0, 4) == "send")
-            {
-                string msg = op.substr(5);
-                bss.broadcast(pid, msg);
-            }
-            else if (op.substr(0, 6) == "recv_B")
-            {
-                int sender_id = stoi(op.substr(8, 1)) - 1;
-                string msg = op.substr(10);
-                bss.receive_B(sender_id, msg, pid);
-            }
-        }
+        for (string &op : operations[pid])
+            bss.push_operation(pid, op);
     }
+
+    bss.simulate();
+    bss.print_output();
 
     return 0;
 }
