@@ -90,12 +90,14 @@ public:
     }
 
     void print_output(vector<int> pids) {
-        for (auto i : pids) {
-            cout << "begin process p" << i + 1 << endl;
-            for (auto &op : operations[i]) {
+        for (int i = 0; i < n; i++) {
+            int id = pids[i];
+            cout << "begin process p" << id + 1 << endl;
+            for (auto &op : operations[id]) {
                 if (!op.empty()) cout << op << endl;
             }
-            cout << "end process p" << i + 1 << endl << endl;
+            cout << "end process p" << id + 1;
+            if (i != n - 1) cout << endl << endl;
         }
     }
 
