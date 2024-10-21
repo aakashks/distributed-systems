@@ -1,9 +1,0 @@
-{
-    "files.associations": {
-        "vector": "cpp",
-        "ostream": "cpp",
-        "string": "cpp",
-        "__split_buffer": "cpp",
-        "deque": "cpp"
-    }
-}

@@ -95,6 +95,8 @@ public:
                 op += " " + print_vc(vector_clocks[pid]);
                 receive_B(sender_id, msg, pid, i);
             }
+            else
+                cout << "Error: Invalid operation" << endl;
         }
     }
 
