@@ -52,8 +52,20 @@ public:
 
     void run_rec_ops(int pid, int op_id) {
         for (int i = op_id; i < operations[pid].size(); i++) {
-            auto op = operations[pid][i];
-            if (op.substr(0, 6) == "recv_B")
+            auto& op = operations[pid][i];
+            if (op.substr(0, 4) == "send") {
+                string msg = op.substr(5);
+                op += " " + broadcast(pid, msg);
+
+                // check if the any process is halted for this message
+                for (int j = 0; j < n; j++) {
+                    if (halted_op[j] != -1 && halted_for_msg[j] == make_pair(pid, msg)) {
+                        halted_for_msg[j] = {-1, ""};
+                        run_rec_ops(j, halted_op[j]);
+                    }
+                }
+            }
+            else if (op.substr(0, 6) == "recv_B")
             {
                 int sender_id = stoi(op.substr(8, 1)) - 1;
                 string msg = op.substr(10);
@@ -62,42 +74,22 @@ public:
                 if (messages[sender_id].count(msg) == 0) {
                     halted_op[pid] = i;
                     halted_for_msg[pid] = {sender_id, msg};
-                    break;
+                    return;
                 }
-
-                receive_B(sender_id, msg, pid);
+                op += " " + print_vc(vector_clocks[pid]);
+                receive_B(sender_id, msg, pid, i);
             }
         }
     }
 
     void simulate() {
         for (int pid = 0; pid < n; pid++) {
-            for (int i = 0; i < operations[pid].size(); i++) {
-                auto& op = operations[pid][i];
-                if (op.substr(0, 4) == "send") {
-                    string msg = op.substr(5);
-                    op += " " + broadcast(pid, msg);
-
-                    // check if the any process is halted for this message
-                    for (int j = 0; j < n; j++) {
-                        if (halted_op[j] != -1 && halted_for_msg[j] == make_pair(pid, msg)) {
-                            int resume_op = halted_op[j];
-                            halted_op[j] = -1;
-                            halted_for_msg[j] = {-1, ""};
-                            run_rec_ops(j, resume_op);
-                        }
-                    }
-                }
-                else if (op.substr(0, 6) == "recv_B")
-                {
-                    run_rec_ops(pid, i);
-                }
-            }
+            run_rec_ops(pid, 0);
         }
     }
 
-    void print_output() {
-        for (int i = 0; i < n; i++) {
+    void print_output(vector<int> pids) {
+        for (auto i : pids) {
             cout << "begin process p" << i + 1 << endl;
             for (auto &op : operations[i]) {
                 if (!op.empty()) cout << op << endl;
@@ -113,28 +105,29 @@ public:
         return print_vc(vector_clocks[sender]);
     }
 
-    void receive_B(int sender, string msg, int receiver)
+    void receive_B(int sender, string msg, int receiver, int op_id)
     {
         vector<int> &local = vector_clocks[receiver];
-        // operations[receiver].push_back("recv_B p" + to_string(sender + 1) + " " + msg + " " + print_vc(local));
 
-        check_buffer(receiver);
+        check_buffer(receiver, op_id);
 
         // check if the current message can be delivered
         if (check_bss(sender, messages[sender][msg], local))
         {
             rec_msgs[receiver].emplace_back(sender, msg);
             merge_vcs(local, messages[sender][msg]);
-            operations[receiver].push_back("recv_A p" + to_string(sender + 1) + " " + msg + " " + print_vc(local));
+            operations[receiver].insert(
+                operations[receiver].begin() + op_id + 1, 
+                "recv_A p" + to_string(sender + 1) + " " + msg + " " + print_vc(local));
         }
 
         else
             buffer[receiver].emplace_back(sender, msg);
 
-        check_buffer(receiver);
+        check_buffer(receiver, op_id);
     }
 
-    void check_buffer(int receiver)
+    void check_buffer(int receiver, int op_id)
     {
         vector<int> &local = vector_clocks[receiver];
         // check previous entries in buffer that can now be delivered
@@ -146,7 +139,9 @@ public:
             {
                 rec_msgs[receiver].emplace_back(s, m);
                 merge_vcs(local, messages[s][m]);
-                operations[receiver].push_back("recv_A p" + to_string(s + 1) + " " + m + " " + print_vc(local));
+                operations[receiver].insert(
+                    operations[receiver].begin() + op_id + 1, 
+                    "recv_A p" + to_string(s + 1) + " " + m + " " + print_vc(local));
                 it = buffer[receiver].erase(it);
             }
             else
@@ -209,7 +204,7 @@ int main()
     }
 
     bss.simulate();
-    bss.print_output();
+    bss.print_output(pids);
 
     return 0;
 }
