@@ -119,12 +119,12 @@ public:
             operations[receiver].insert(
                 operations[receiver].begin() + op_id + 1, 
                 "recv_A p" + to_string(sender + 1) + " " + msg + " " + print_vc(local));
+            
+            check_buffer(receiver, op_id+1);
         }
-
         else
             buffer[receiver].emplace_back(sender, msg);
 
-        check_buffer(receiver, op_id);
     }
 
     void check_buffer(int receiver, int op_id)
