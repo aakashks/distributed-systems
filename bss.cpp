@@ -57,11 +57,11 @@ class BSS
 public:
     BSS(int n = 9) : n(n), vector_clocks(n, vector<int>(n, 0)), messages(n), rec_msgs(n), buffer(n) {}
 
-    void broadcast(int sender, string msg)
+    string broadcast(int sender, string msg)
     {
         vector_clocks[sender][sender]++;
         messages[sender][msg] = vector_clocks[sender];
-        cout << "send " << msg << " " << print_vc(vector_clocks[sender]) << endl;
+        return print_vc(vector_clocks[sender]);
     }
 
     void receive_B(int sender, string msg, int receiver)
@@ -108,7 +108,7 @@ public:
 int main()
 {
     string line;
-    map<int, vector<string>> operations;
+    vector<pair<int, vector<string>>> operations;
     int pi;
     int np = 0;
 
@@ -118,6 +118,7 @@ int main()
         {
             string process_name = line.substr(14);
             pi = stoi(process_name.substr(1)) - 1;
+            operations.push_back({pi, {}});
         }
         else if (line.substr(0, 11) == "end process")
         {
@@ -126,7 +127,7 @@ int main()
         }
         else
         {
-            operations[pi].push_back(line);
+            operations.back().second.push_back(line);
         }
     }
 
@@ -136,12 +137,13 @@ int main()
     {
         cout << "begin process p" << pid + 1 << endl;
 
-        for (const string &op : ops)
+        for (string &op : ops)
         {
             if (op.substr(0, 4) == "send")
             {
                 string msg = op.substr(5);
-                bss.broadcast(pid, msg);
+                op += " ";
+                op += bss.broadcast(pid, msg);
             }
             else if (op.substr(0, 6) == "recv_B")
             {
