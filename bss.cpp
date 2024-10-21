@@ -7,6 +7,21 @@
 
 using namespace std;
 
+string print_vc(const vector<int> &vc)
+{
+    string s;
+    for (auto x : vc)
+        s += to_string(x);
+
+    return "(" + s + ")";
+}
+
+void merge_vcs(vector<int> &local, vector<int> &received)
+{
+    for (int i = 0; i < local.size(); i++)
+        local[i] = max(local[i], received[i]);
+}
+
 class BSS
 {
     vector<vector<int>> vector_clocks;
@@ -97,7 +112,8 @@ public:
                 if (!op.empty()) cout << op << endl;
             }
             cout << "end process p" << id + 1;
-            if (i != n - 1) cout << endl << endl;
+            // if (i != n - 1) 
+                cout << endl << endl;
         }
     }
 
@@ -152,25 +168,6 @@ public:
             }
             else
                 it++;
-        }
-    }
-
-    /////
-
-    string print_vc(const vector<int> &vc)
-    {
-        string s = "(";
-        for (auto x : vc)
-            s += to_string(x);
-        s += ")";
-        return s;
-    }
-
-    void merge_vcs(vector<int> &local, vector<int> &received)
-    {
-        for (int i = 0; i < local.size(); i++)
-        {
-            local[i] = max(local[i], received[i]);
         }
     }
 };
