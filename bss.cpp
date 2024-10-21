@@ -21,6 +21,9 @@ class BSS
     // every process maintains its buffer which stores delayed messages
     vector<vector<pair<int, string>>> buffer;
 
+    // operations (final output)
+    vector<vector<string>> operations;
+
     int n;
 
     bool check_bss(int sender, vector<int> &vt, vector<int> &local)
@@ -42,7 +45,8 @@ class BSS
         {
             int s = it->first;
             string m = it->second;
-            if (messages[s].find(m) != messages[s].end() && check_bss(s, messages[s][m], local))
+            if (messages[s].find(m) != messages[s].end() 
+                    && check_bss(s, messages[s][m], local))
             {
                 rec_msgs[receiver].emplace_back(s, m);
                 merge_vcs(local, messages[s][m]);
@@ -55,28 +59,30 @@ class BSS
     }
 
 public:
-    BSS(int n = 9) : n(n), vector_clocks(n, vector<int>(n, 0)), messages(n), rec_msgs(n), buffer(n) {}
+    BSS(int n = 9) : n(n), vector_clocks(n, vector<int>(n, 0)), messages(n), 
+        rec_msgs(n), buffer(n), operations(n) {}
 
-    string broadcast(int sender, string msg)
+    void broadcast(int sender, string msg)
     {
         vector_clocks[sender][sender]++;
         messages[sender][msg] = vector_clocks[sender];
-        return print_vc(vector_clocks[sender]);
+        operations[sender].push_back("send " + msg + " " + print_vc(vector_clocks[sender]));
     }
 
     void receive_B(int sender, string msg, int receiver)
     {
         vector<int> &local = vector_clocks[receiver];
-        cout << "recv_B p" << sender + 1 << " " << msg << " " << print_vc(local) << endl;
+        operations[receiver].push_back("recv_B p" + to_string(sender + 1) + " " + msg + " " + print_vc(local));
 
         check_buffer(local, receiver);
 
         // check if the current message can be delivered
-        if (messages[sender].find(msg) != messages[sender].end() && check_bss(sender, messages[sender][msg], local))
+        if (messages[sender].find(msg) != messages[sender].end() 
+                && check_bss(sender, messages[sender][msg], local))
         {
             rec_msgs[receiver].emplace_back(sender, msg);
             merge_vcs(local, messages[sender][msg]);
-            cout << "recv_A p" << sender + 1 << " " << msg << " " << print_vc(local) << endl;
+            operations[receiver].push_back("recv_A p" + to_string(sender + 1) + " " + msg + " " + print_vc(local));
         }
 
         else
@@ -135,15 +141,12 @@ int main()
 
     for (auto [pid, ops] : operations)
     {
-        cout << "begin process p" << pid + 1 << endl;
-
         for (string &op : ops)
         {
             if (op.substr(0, 4) == "send")
             {
                 string msg = op.substr(5);
-                op += " ";
-                op += bss.broadcast(pid, msg);
+                bss.broadcast(pid, msg);
             }
             else if (op.substr(0, 6) == "recv_B")
             {
@@ -152,7 +155,6 @@ int main()
                 bss.receive_B(sender_id, msg, pid);
             }
         }
-        cout << "end process p" << pid + 1 << endl << endl;
     }
 
     return 0;
