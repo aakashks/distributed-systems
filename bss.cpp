@@ -44,7 +44,8 @@ class BSS
 
 public:
     BSS(int n = 9) : n(n), vector_clocks(n, vector<int>(n, 0)), messages(n), 
-        rec_msgs(n), buffer(n), operations(n), halted_op(n, -1), halted_for_msg(n, make_pair(-1, "")) {}
+        rec_msgs(n), buffer(n), operations(n), halted_op(n, -1), 
+        halted_for_msg(n, make_pair(-1, "")) {}
 
     void push_operation(int pid, string op) {
         operations[pid].push_back(op);
@@ -143,6 +144,9 @@ public:
                     operations[receiver].begin() + op_id + 1, 
                     "recv_A p" + to_string(s + 1) + " " + m + " " + print_vc(local));
                 it = buffer[receiver].erase(it);
+                
+                it = buffer[receiver].begin();
+                op_id++;
             }
             else
                 it++;
