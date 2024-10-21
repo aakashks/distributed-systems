@@ -179,6 +179,7 @@ int main()
     vector<vector<string>> operations(9);
     int pi;
     int np = 0;
+    int max_pid = 0;
 
     while (getline(cin, line))
     {
@@ -187,6 +188,7 @@ int main()
             string process_name = line.substr(14);
             pi = stoi(process_name.substr(1)) - 1;
             pids.push_back(pi);
+            max_pid = max(max_pid, pi);
         }
         else if (line.substr(0, 11) == "end process")
         {
@@ -196,6 +198,12 @@ int main()
         else
             operations[pi].push_back(line);
 
+    }
+
+    if (max_pid == 0 || max_pid != np-1)
+    {
+        cout << "Error" << endl;
+        return 0;
     }
 
     BSS bss(np);
