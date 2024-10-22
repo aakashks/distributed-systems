@@ -66,7 +66,7 @@ public:
         operations[pid].push_back(op);
     }
 
-    void run_rec_ops(int pid, int op_id) {
+    void run_ops(int pid, int op_id) {
         for (int i = op_id; i < operations[pid].size(); i++) {
             auto& op = operations[pid][i];
             if (op.substr(0, 4) == "send") {
@@ -76,8 +76,10 @@ public:
                 // check if the any process is halted for this message
                 for (int j = 0; j < n; j++) {
                     if (halted_op[j] != -1 && halted_for_msg[j] == make_pair(pid, msg)) {
+                        int resuming_op = halted_op[j];
+                        halted_op[j] = -1;
                         halted_for_msg[j] = {-1, ""};
-                        run_rec_ops(j, halted_op[j]);
+                        run_ops(j, resuming_op);
                     }
                 }
             }
@@ -95,15 +97,22 @@ public:
                 op += " " + print_vc(vector_clocks[pid]);
                 receive_B(sender_id, msg, pid, i);
             }
-            else
-                cout << "Error: Invalid operation" << endl;
         }
     }
 
-    void simulate() {
+    bool simulate() {
         for (int pid = 0; pid < n; pid++) {
-            run_rec_ops(pid, 0);
+            run_ops(pid, 0);
         }
+
+        // check if any process is halted
+        for (int i = 0; i < n; i++) {
+            if (halted_op[i] != -1) {
+                cout << "Error: No send operation for the received message" << endl;
+                return false;
+            }
+        }
+        return true;
     }
 
     void print_output(vector<int> pids) {
@@ -216,7 +225,8 @@ int main()
             bss.push_operation(pid, op);
     }
 
-    bss.simulate();
+    if (!bss.simulate())
+        return 0;
     bss.print_output(pids);
 
     return 0;
